@@ -23,6 +23,7 @@ def print_menu():
     print("\nEjercicios disponibles:")
     print("-" * 70)
     print("  [1] Ejercicio 1: Detección y Clasificación de Monedas y Dados")
+    print("  [2] Ejercicio 2: Segmentación de Patentes")
     print("  [0] Salir")
     print("-" * 70)
 
@@ -67,10 +68,42 @@ def ejecutar_ejercicio_1():
 
 
 def ejecutar_ejercicio_2():
-    """Ejecuta el Ejercicio 2 (placeholder para futuro desarrollo)."""
-    print("\n" + "!" * 70)
-    print("Ejercicio 2: Aún no implementado")
-    print("!" * 70)
+    """Ejecuta el Ejercicio 2."""
+    try:
+        # Agregar el directorio del ejercicio al path
+        ejercicio_path = Path(__file__).parent / "Ejercicio-2"
+        sys.path.insert(0, str(ejercicio_path))
+
+        # Cambiar al directorio del ejercicio para rutas relativas
+        original_dir = os.getcwd()
+        os.chdir(ejercicio_path)
+
+        # Importar y ejecutar
+        from ejercicio2 import main as ejercicio2_main
+
+        print("\n" + "=" * 70)
+        print("INICIANDO EJERCICIO 2")
+        print("=" * 70)
+
+        ejercicio2_main()
+
+        # Restaurar directorio original
+        os.chdir(original_dir)
+        sys.path.pop(0)
+
+    except ImportError as e:
+        print(f"\nError: No se pudo importar el ejercicio 2.")
+        print(f"Detalles: {e}")
+    except FileNotFoundError as e:
+        print(f"\nError: No se encontró un archivo necesario.")
+        print(f"Detalles: {e}")
+    except Exception as e:
+        print(f"\nError inesperado al ejecutar el ejercicio 2:")
+        print(f"Tipo: {type(e).__name__}")
+        print(f"Detalles: {e}")
+    finally:
+        # Asegurar que volvemos al directorio original
+        os.chdir(original_dir)
 
 
 def ejecutar_ejercicio_3():
@@ -89,7 +122,7 @@ def main():
         while True:
             print_menu()
             try:
-                opcion = input("\nSeleccione un ejercicio (0-1): ").strip()
+                opcion = input("\nSeleccione un ejercicio (0-2): ").strip()
 
                 if opcion == "0":
                     print("\n" + "=" * 70)
