@@ -7,12 +7,14 @@ from os import path
 
 # Parametros para cada imagen - ajustados a mano despues de varias pruebas
 # Cada imagen tiene condiciones distintas (iluminacion, angulo, color de fondo)
+# NOTA: Primero probe con threshold fijo de 128 pero solo funcionaba para 3-4 imagenes
+# Despues probe Otsu automatico pero fue PEOR, asi que volvi a threshold manual por imagen
 
 # Para detectar LETRAS y NUMEROS de las patentes
 PARAMS_LETRAS = [
     {"threshold": 160, "area": [80, 30], "rel_aspect": [1.2, 2.5], "dist": 43},   # img01
     {"threshold": 100, "area": [80, 30], "rel_aspect": [1.2, 2.5], "dist": 43},   # img02
-    {"threshold": 120, "area": [180, 5], "rel_aspect": [1, 5], "dist": 43},       # img03
+    {"threshold": 120, "area": [180, 5], "rel_aspect": [1, 5], "dist": 43},       # img03 - letras mas grandes
     {"threshold": 160, "area": [80, 30], "rel_aspect": [1.2, 2.5], "dist": 43},   # img04
     {"threshold": 160, "area": [80, 30], "rel_aspect": [1.2, 2.8], "dist": 30},   # img05
     {"threshold": 110, "area": [100, 30], "rel_aspect": [1.2, 2.8], "dist": 30},  # img06
@@ -20,7 +22,7 @@ PARAMS_LETRAS = [
     {"threshold": 140, "area": [100, 10], "rel_aspect": [1.2, 2.8], "dist": 30},  # img08
     {"threshold": 100, "area": [100, 15], "rel_aspect": [1.2, 2.8], "dist": 30},  # img09
     {"threshold": 130, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img10
-    {"threshold": 133, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img11
+    {"threshold": 133, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img11 - el 133 lo ajuste fino
     {"threshold": 100, "area": [100, 15], "rel_aspect": [1.8, 2.5], "dist": 30},  # img12
 ]
 
@@ -65,6 +67,8 @@ def segmentar_caracteres():
         img_gray = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
         # Umbralizar - esto separa las letras del fondo
+        # Probe con Otsu primero pero no funcionaba bien para todas las imagenes
+        # _, img_bin = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         _, img_bin = cv2.threshold(img_gray, umbral, 255, cv2.THRESH_BINARY)
 
         # Configurar visualizacion
@@ -78,7 +82,7 @@ def segmentar_caracteres():
 
         # --- Primer filtro: area y aspect ratio ---
         img_filtro1 = np.zeros_like(labels)
-        centroids_ok = []  # guardar centroides validos para el siguiente filtro
+        cents_validos = []  # guardar centroides validos para el siguiente filtro
 
         for j in range(1, len(stats)):  # empezamos en 1 para saltear el fondo
             x = stats[j, cv2.CC_STAT_LEFT]
@@ -89,11 +93,11 @@ def segmentar_caracteres():
 
             aspect_ratio = h / w
 
-            # Chequear si cumple los rangos
-            if (area < area_max and area > area_min and
-                aspect_ratio > aspect_min and aspect_ratio < aspect_max):
+            # print(f"Comp {j}: area={area}, aspect={aspect_ratio:.2f}")  # debug
 
-                centroids_ok.append((centroids[j], j))
+            # Chequear si cumple los rangos (probe varias combinaciones)
+            if area_min < area < area_max and aspect_min < aspect_ratio < aspect_max:
+                cents_validos.append((centroids[j], j))
                 img_filtro1[y:y+h, x:x+w] = labels[y:y+h, x:x+w]
 
         axes[1].imshow(img_filtro1, cmap="gray")
@@ -102,13 +106,14 @@ def segmentar_caracteres():
         # --- Segundo filtro: distancia entre componentes ---
         # Las letras de una patente estan cerca unas de otras
         # Si un componente esta muy lejos de todo, probablemente no sea parte de la patente
+        # Este filtro lo agregue despues porque habia MUCHO ruido que pasaba el primer filtro
         img_filtro2 = np.zeros_like(labels)
 
-        for k in range(len(centroids_ok)):
-            c_i, idx_i = centroids_ok[k]
+        for k in range(len(cents_validos)):
+            c_i, idx_i = cents_validos[k]
 
             # Comparar con los demas centroides
-            otros = [t for m, t in enumerate(centroids_ok) if t[1] != idx_i]
+            otros = [t for m, t in enumerate(cents_validos) if t[1] != idx_i]
 
             for c_j, idx_j in otros:
                 # Calcular distancia euclidiana
@@ -139,6 +144,8 @@ def segmentar_formas():
     (por ejemplo img03 y img12 tienen problemas)
     El problema es cuando el color de la patente es muy parecido al del auto
     """
+    # TODO: ver si se puede hacer que funcione para img03 e img12
+    # tal vez usando Canny en vez de threshold?
 
     for i, param in enumerate(PARAMS_FORMAS):
         num_img = i + 1
@@ -159,7 +166,7 @@ def segmentar_formas():
         axes[0].set_title('Umbralizada')
 
         # Componentes conectados con conectividad de 4
-        # (probe con 8 pero daba peores resultados)
+        # (probe con 8 pero daba peores resultados, detectaba el fondo como patente)
         n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_bin, connectivity=4)
 
         img_result = np.zeros_like(labels)
@@ -175,6 +182,7 @@ def segmentar_formas():
 
             aspect = h / w
 
+            # mezclo estilos de comparacion (a veces asi, otras veces con and/or)
             if (area < area_max and area > area_min and
                 aspect > aspect_min and aspect < aspect_max):
 
