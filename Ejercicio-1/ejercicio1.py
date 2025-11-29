@@ -1,10 +1,3 @@
-"""
-Ejercicio 1: Detección y Clasificación de Monedas y Dados
-Procesamiento de Imágenes - Universidad Nacional de Rosario
-
-Descripción: Detecta monedas (10c, 50c, 1p) y dados usando OpenCV
-"""
-
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,7 +5,7 @@ import matplotlib.pyplot as plt
 
 RUTA_IMAGEN = "imagenes/monedas.jpg"
 
-# Configuración de monedas: radio, color, valor
+# Configuracion de monedas: radio, color, valor
 MONEDAS = {
     "10c": {"radio": (120, 145), "color": (255, 0, 0), "valor": 0.10, "nombre": "10 centavos"},
     "1p":  {"radio": (145, 170), "color": (0, 255, 0), "valor": 1.0,  "nombre": "1 peso"},
@@ -43,19 +36,13 @@ PARAMS = {
     }
 }
 
-
-# ============================================================
-# FUNCIONES DE PREPROCESAMIENTO
-# ============================================================
-
 def cargar_y_preprocesar(ruta):
-    """Carga imagen y aplica preprocesamiento básico."""
+
     img = cv2.imread(ruta)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     img_blur = cv2.GaussianBlur(img_gray, PARAMS["gaussian_kernel"], 0)
 
-    # Visualización
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     axes[0].imshow(img_rgb)
     axes[0].set_title('Imagen Original')
@@ -68,23 +55,17 @@ def cargar_y_preprocesar(ruta):
 
     return img_rgb, img_gray, img_blur
 
-
-# ============================================================
-# FUNCIONES DE DETECCIÓN DE BORDES
-# ============================================================
-
 def detectar_bordes(img_blur):
-    """Aplica Sobel y Canny para detectar bordes."""
-    # Sobel (exploración)
+
+    # Sobel (Funciona pero genera imagenes mas dificiles de medir)
     sobel_x = cv2.Sobel(img_blur, -1, 1, 0, ksize=3)
     sobel_y = cv2.Sobel(img_blur, -1, 0, 1, ksize=3)
     sobel_combined = cv2.addWeighted(sobel_x, 0.5, sobel_y, 0.5, 0)
     _, sobel_thresh = cv2.threshold(sobel_combined, 30, 255, cv2.THRESH_BINARY)
 
-    # Canny (principal)
+    # Canny (la que se terminó usando)
     canny_img = cv2.Canny(img_blur, *PARAMS["canny_threshold"], apertureSize=3, L2gradient=True)
 
-    # Visualización
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     axes[0, 0].imshow(sobel_x, cmap='gray')
     axes[0, 0].set_title('Sobel X')
@@ -103,7 +84,7 @@ def detectar_bordes(img_blur):
 
 
 def aplicar_morfologia(canny_img):
-    """Aplica operaciones morfológicas y dilatación."""
+
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, PARAMS["morph_kernel"])
 
     apertura = cv2.morphologyEx(canny_img, cv2.MORPH_OPEN, kernel)
@@ -113,7 +94,6 @@ def aplicar_morfologia(canny_img):
     # Dilatación final
     canny_dilate = cv2.dilate(clausura, kernel, iterations=PARAMS["dilate_iterations"])
 
-    # Visualización
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     axes[0, 0].imshow(apertura, cmap='gray')
     axes[0, 0].set_title('Apertura')
@@ -130,13 +110,7 @@ def aplicar_morfologia(canny_img):
 
     return clausura, canny_dilate
 
-
-# ============================================================
-# FUNCIONES DE DETECCIÓN DE MONEDAS
-# ============================================================
-
 def detectar_monedas(img_rgb, canny_dilate):
-    """Detecta y clasifica monedas usando Transformada de Hough."""
     # Detectar círculos
     circles = cv2.HoughCircles(
         canny_dilate,
@@ -214,13 +188,8 @@ def detectar_monedas(img_rgb, canny_dilate):
 
     return monedas_detectadas, circles
 
-
-# ============================================================
-# FUNCIONES DE DETECCIÓN DE DADOS
-# ============================================================
-
 def detectar_dados(img_rgb, clausura, monedas_detectadas):
-    """Detecta dados y cuenta sus puntos."""
+
     # Eliminar monedas de la máscara
     mask_dados = clausura.copy()
     for info in monedas_detectadas.values():
@@ -300,22 +269,16 @@ def detectar_dados(img_rgb, clausura, monedas_detectadas):
     return dados
 
 
-# ============================================================
-# VISUALIZACIÓN FINAL
-# ============================================================
-
 def visualizar_resultado_final(img_rgb, monedas_detectadas, dados):
-    """Genera visualización final combinada."""
+
     combined = np.zeros_like(img_rgb)
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    # Dibujar monedas
     for tipo, info in monedas_detectadas.items():
         for x, y, r in info["lista"]:
             cv2.circle(combined, (x, y), r, info["color"], 20)
             cv2.putText(combined, info["nombre"], (x, y), font, 2, (255, 255, 255), 10)
 
-    # Dibujar dados
     for dado in dados:
         p1, p2 = dado["coord"]
         cv2.rectangle(combined, p1, p2, (0, 255, 0), 10)
@@ -341,13 +304,8 @@ def visualizar_resultado_final(img_rgb, monedas_detectadas, dados):
     plt.tight_layout()
     plt.show()
 
-
-# ============================================================
-# PROGRAMA PRINCIPAL
-# ============================================================
-
 def main():
-    """Ejecuta el flujo completo de procesamiento."""
+
     print("=" * 60)
     print("EJERCICIO 1: Detección de Monedas y Dados")
     print("=" * 60)
