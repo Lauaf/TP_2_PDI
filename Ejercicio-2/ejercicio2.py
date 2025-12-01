@@ -5,10 +5,8 @@ import math
 from os import path
 
 
-# Parametros para cada imagen - ajustados a mano despues de varias pruebas
+# Parametros para cada imagen - ajustados 
 # Cada imagen tiene condiciones distintas (iluminacion, angulo, color de fondo)
-# NOTA: Primero probe con threshold fijo de 128 pero solo funcionaba para 3-4 imagenes
-# Despues probe Otsu automatico pero fue PEOR, asi que volvi a threshold manual por imagen
 
 # Para detectar LETRAS y NUMEROS de las patentes
 PARAMS_LETRAS = [
@@ -22,7 +20,7 @@ PARAMS_LETRAS = [
     {"threshold": 140, "area": [100, 10], "rel_aspect": [1.2, 2.8], "dist": 30},  # img08
     {"threshold": 100, "area": [100, 15], "rel_aspect": [1.2, 2.8], "dist": 30},  # img09
     {"threshold": 130, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img10
-    {"threshold": 133, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img11 - el 133 lo ajuste fino
+    {"threshold": 133, "area": [100, 30], "rel_aspect": [1.2, 2.5], "dist": 30},  # img11
     {"threshold": 100, "area": [100, 15], "rel_aspect": [1.8, 2.5], "dist": 30},  # img12
 ]
 
@@ -30,7 +28,7 @@ PARAMS_LETRAS = [
 PARAMS_FORMAS = [
     {"threshold": 150, "area": [800, 200], "rel_aspect": [0.1, 0.5]},             # img01
     {"threshold": 100, "area": [1000, 500], "rel_aspect": [0.2, 2.0]},            # img02
-    {"threshold": 100, "area": [10000, 100], "rel_aspect": [1, 5]},               # img03 - no anda bien
+    {"threshold": 100, "area": [10000, 100], "rel_aspect": [1, 5]},               # img03
     {"threshold": 150, "area": [900, 800], "rel_aspect": [0.5, 1.5]},             # img04
     {"threshold": 160, "area": [10000, 2000], "rel_aspect": [0.1, 1.5]},          # img05
     {"threshold": 100, "area": [2000, 1000], "rel_aspect": [0.1, 2.0]},           # img06
@@ -39,7 +37,7 @@ PARAMS_FORMAS = [
     {"threshold": 100, "area": [1200, 500], "rel_aspect": [0.2, 0.5]},            # img09
     {"threshold": 110, "area": [2000, 1000], "rel_aspect": [0.3, 1.5]},           # img10
     {"threshold": 133, "area": [2000, 500], "rel_aspect": [0.3, 0.5]},            # img11
-    {"threshold": 100, "area": [100, 15], "rel_aspect": [1.8, 2.5], "dist": 30},  # img12 - tampoco funciona bien
+    {"threshold": 100, "area": [100, 15], "rel_aspect": [1.8, 2.5], "dist": 30},  # img12
 ]
 
 
@@ -47,7 +45,7 @@ def segmentar_caracteres():
     """
     Segmenta las letras y numeros de las patentes.
 
-    El truco es usar componentes conectados y filtrar por:
+    Utiliza componentes conectados y filtra por:
     - Area (los caracteres tienen un tamaño similar)
     - Aspect ratio (alto/ancho de cada letra)
     - Distancia entre componentes (las letras estan juntas)
@@ -66,9 +64,7 @@ def segmentar_caracteres():
         img_path = path.join("imagenes", f"img{str(num_img).rjust(2, '0')}.png")
         img_gray = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
-        # Umbralizar - esto separa las letras del fondo
-        # Probe con Otsu primero pero no funcionaba bien para todas las imagenes
-        # _, img_bin = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Umbralizar: separa las letras del fondo
         _, img_bin = cv2.threshold(img_gray, umbral, 255, cv2.THRESH_BINARY)
 
         # Configurar visualizacion
@@ -76,8 +72,7 @@ def segmentar_caracteres():
         axes[0].imshow(img_bin, cmap="gray")
         axes[0].set_title("Umbralizada")
 
-        # Encontrar componentes conectados
-        # Esto agrupa pixeles blancos que estan juntos
+        # Encontrar componentes conectados: agrupa pixeles blancos que estan juntos
         n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_bin, connectivity=8)
 
         # --- Primer filtro: area y aspect ratio ---
@@ -93,9 +88,7 @@ def segmentar_caracteres():
 
             aspect_ratio = h / w
 
-            # print(f"Comp {j}: area={area}, aspect={aspect_ratio:.2f}")  # debug
-
-            # Chequear si cumple los rangos (probe varias combinaciones)
+            # Chequear si cumple los rangos
             if area_min < area < area_max and aspect_min < aspect_ratio < aspect_max:
                 cents_validos.append((centroids[j], j))
                 img_filtro1[y:y+h, x:x+w] = labels[y:y+h, x:x+w]
@@ -106,7 +99,6 @@ def segmentar_caracteres():
         # --- Segundo filtro: distancia entre componentes ---
         # Las letras de una patente estan cerca unas de otras
         # Si un componente esta muy lejos de todo, probablemente no sea parte de la patente
-        # Este filtro lo agregue despues porque habia MUCHO ruido que pasaba el primer filtro
         img_filtro2 = np.zeros_like(labels)
 
         for k in range(len(cents_validos)):
@@ -127,8 +119,7 @@ def segmentar_caracteres():
                     h = stats[idx_i, cv2.CC_STAT_HEIGHT]
 
                     img_filtro2[y:y+h, x:x+w] = labels[y:y+h, x:x+w]
-                    break  # ya sabemos que esta cerca de algo
-
+                    break 
         axes[2].imshow(img_filtro2, cmap="gray")
         axes[2].set_title("Filtro 2: distancia")
 
@@ -138,14 +129,9 @@ def segmentar_caracteres():
 
 def segmentar_formas():
     """
-    Intenta segmentar la forma completa de la patente.
-
-    NOTA: Este metodo no funciona muy bien en todas las imagenes
-    (por ejemplo img03 y img12 tienen problemas)
-    El problema es cuando el color de la patente es muy parecido al del auto
+    Segmentar la forma completa de la patente.
+    Encuentra problemas cuando el color de la patente es muy parecido al del auto
     """
-    # TODO: ver si se puede hacer que funcione para img03 e img12
-    # tal vez usando Canny en vez de threshold?
 
     for i, param in enumerate(PARAMS_FORMAS):
         num_img = i + 1
@@ -166,7 +152,6 @@ def segmentar_formas():
         axes[0].set_title('Umbralizada')
 
         # Componentes conectados con conectividad de 4
-        # (probe con 8 pero daba peores resultados, detectaba el fondo como patente)
         n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_bin, connectivity=4)
 
         img_result = np.zeros_like(labels)
@@ -182,7 +167,6 @@ def segmentar_formas():
 
             aspect = h / w
 
-            # mezclo estilos de comparacion (a veces asi, otras veces con and/or)
             if (area < area_max and area > area_min and
                 aspect > aspect_min and aspect < aspect_max):
 
